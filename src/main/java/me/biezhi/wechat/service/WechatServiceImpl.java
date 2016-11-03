@@ -359,15 +359,44 @@ public class WechatServiceImpl implements WechatService {
 
             if (msgType == 51) {
                 LOGGER.info("成功截获微信初始化消息");
+            } else if(-1 != msg.getString("FromUserName").indexOf("@@")){
+                String[] peopleContent = content.split(":<br/>");
+                LOGGER.info("|" + name + "| " + peopleContent[0] + ":\n" + peopleContent[1].replace("<br/>", "\n"));
+                LOGGER.info("群消息");
+                if (msgType == 1) {
+                    if (Constant.FILTER_USERS.contains(msg.getString("FromUserName"))) {
+                        continue;
+                    } else if (msg.getString("FromUserName").equals(wechatMeta.getUser().getString("UserName"))) {
+                        continue;
+                    } else {
+                        LOGGER.info(name + ": " + content);
+                        String ans = robot.talk(content);
+                        webwxsendmsg(wechatMeta, ans, msg.getString("FromUserName"));
+                        LOGGER.info("群自动回复 " + ans);
+                    }
+                } else if (msgType == 3) {
+                    String imgDir = Constant.config.get("app.img_path");
+                    String msgId = msg.getString("MsgId");
+                    FileKit.createDir(imgDir, false);
+                    String imgUrl = wechatMeta.getBase_uri() + "/webwxgetmsgimg?MsgID=" + msgId + "&skey=" + wechatMeta.getSkey() + "&type=slave";
+                    HttpRequest.get(imgUrl).header("Cookie", wechatMeta.getCookie()).receive(new File(imgDir + "/" + msgId + ".jpg"));
+                    // TODO: 2016-11-03  发送图片
+                    webwxsendmsg(wechatMeta, "二蛋还不支持图片呢", msg.getString("FromUserName"));
+                } else if (msgType == 34) {
+                    webwxsendmsg(wechatMeta, "二蛋还不支持语音呢", msg.getString("FromUserName"));
+                } else if (msgType == 42) {
+                    LOGGER.info(name + " 给你发送了一张名片:");
+                    LOGGER.info("=========================");
+                } else if (msgType == 47) {
+                    webwxsendmsg(wechatMeta, "我还没有表情", msg.getString("FromUserName"));
+                    LOGGER.info(name + " 给你发送了一个表情:");
+                    LOGGER.info("=========================");
+                }
             } else if (msgType == 1) {
                 if (Constant.FILTER_USERS.contains(msg.getString("ToUserName"))) {
                     continue;
                 } else if (msg.getString("FromUserName").equals(wechatMeta.getUser().getString("UserName"))) {
                     continue;
-                } else if (msg.getString("ToUserName").indexOf("@@") != -1) {
-                    String[] peopleContent = content.split(":<br/>");
-                    LOGGER.info("|" + name + "| " + peopleContent[0] + ":\n" + peopleContent[1].replace("<br/>", "\n"));
-                    LOGGER.info("群消息");
                 } else {
                     LOGGER.info(name + ": " + content);
                     String ans = robot.talk(content);
@@ -380,6 +409,7 @@ public class WechatServiceImpl implements WechatService {
                 FileKit.createDir(imgDir, false);
                 String imgUrl = wechatMeta.getBase_uri() + "/webwxgetmsgimg?MsgID=" + msgId + "&skey=" + wechatMeta.getSkey() + "&type=slave";
                 HttpRequest.get(imgUrl).header("Cookie", wechatMeta.getCookie()).receive(new File(imgDir + "/" + msgId + ".jpg"));
+                // TODO: 2016-11-03  发送图片
                 webwxsendmsg(wechatMeta, "二蛋还不支持图片呢", msg.getString("FromUserName"));
             } else if (msgType == 34) {
                 webwxsendmsg(wechatMeta, "二蛋还不支持语音呢", msg.getString("FromUserName"));
@@ -424,7 +454,7 @@ public class WechatServiceImpl implements WechatService {
     }
 
     private String getUserRemarkName(String id) {
-        String name = "这个人物名字未知";
+        String name = "群里人";
         for (int i = 0, len = Constant.CONTACT.getMemberList().size(); i < len; i++) {
             JSONObject member = Constant.CONTACT.getMemberList().get(i).asJSONObject();
             if (member.getString("UserName").equals(id)) {
